@@ -23,11 +23,12 @@ def input_api_key():
 @st.cache_data
 def get_gpt_response(api_key, prompt):
     openai.api_key = api_key
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=150
     )
-    return response.choices[0].message["content"]
+    return response.choices[0].text.strip()
 
 # GPT 페이지
 def gpt_page():

@@ -2,10 +2,7 @@ import streamlit as st
 from openai import OpenAI
 
 st.write("Hello!, require Any qeustions! ")
-st.text_input(label="your OpenAi Api key:", type="password")
-
-# OpenAI API 키 설정
-openai.api_key = 'your-api-key'
+openai.api_key = st.text_input(label="your OpenAi Api key:", type="password")
 
 def chat_with_gpt(prompt):
     response = openai.Completion.create(

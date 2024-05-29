@@ -1,48 +1,79 @@
 import streamlit as st
+import time
 import openai
 
-# 페이지 구성 설정
-st.set_page_config(page_title="GPT-3.5-turbo Web App", layout="wide")
+# OpenAI API 키를 세션 상태로 저장합니다.
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = ''
 
-# 세션 상태 초기화
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
-if "gpt_prompt" not in st.session_state:
-    st.session_state.gpt_prompt = ""
-if "gpt_response" not in st.session_state:
-    st.session_state.gpt_response = None
-
-# API 키 입력 함수
+# API 키를 입력받는 함수
 def input_api_key():
-    api_key = st.text_input("OpenAI API Key", type="password")
-    if api_key:
-        st.session_state.api_key = api_key
+    st.session_state.api_key = st.text_input("OpenAI API Key", type="password")
+    if st.session_state.api_key:
         st.success("API Key saved")
 
-# GPT-3.5-turbo 응답 함수
-@st.cache_data
-def get_gpt_response(api_key, prompt):
-    openai.api_key = api_key
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=150
+# API 키를 설정합니다.
+if st.session_state.api_key:
+    openai.api_key = st.session_state.api_key
+    assistant_id = "asst_hmnS67oNCLNK80ZJ40QLAK2C"
+else:
+    assistant_id = None
+
+def load_openai_client_and_assistant(api_key, assistant_id):
+    client = openai.OpenAI(api_key=api_key)
+    my_assistant = client.beta.assistants.retrieve(assistant_id)
+    thread = client.beta.threads.create()
+    return client, my_assistant, thread
+
+def wait_on_run(run, thread, client):
+    while run.status == "queued" or run.status == "in_progress":
+        run = client.beta.threads.runs.retrieve(
+            thread_id=thread.id,
+            run_id=run.id,
+        )
+        time.sleep(0.5)
+    return run
+
+def get_assistant_response(client, my_assistant, assistant_thread, user_input):
+    message = client.beta.threads.messages.create(
+        thread_id=assistant_thread.id,
+        assistant_id=assistant_id,
+        content=user_input
     )
-    return response.choices[0].text.strip()
 
-# GPT 페이지
-def gpt_page():
-    st.title("GPT-3.5-turbo")
-    input_api_key()
+    run = client.beta.threads.runs.create(
+        thread_id=assistant_thread.id,
+        assistant_id=assistant_id,
+    )
 
-    prompt = st.text_area("Enter your question for GPT-3.5-turbo", value=st.session_state.gpt_prompt)
-    if st.button("Get Response"):
-        st.session_state.gpt_prompt = prompt
-        st.session_state.gpt_response = get_gpt_response(st.session_state.api_key, prompt)
+    run = wait_on_run(run, assistant_thread, client)
 
-    if st.session_state.gpt_response:
-        st.write(st.session_state.gpt_response)
+    messages = client.beta.threads.messages.list(
+        thread_id=assistant_thread.id, order="asc", after=message.id
+    )
 
-# Streamlit 앱 실행
-if __name__ == "__main__":
-    gpt_page()
+    return messages.data[0].content[0].text.value
+
+if 'user_input' not in st.session_state:
+    st.session_state.user_input = ''
+
+def submit():
+    st.session_state.user_input = st.session_state.query
+    st.session_state.query = ''
+
+st.title("Hello")
+
+input_api_key()
+
+if assistant_id:
+    client, my_assistant, assistant_thread = load_openai_client_and_assistant(st.session_state.api_key, assistant_id)
+
+    st.text_input("Communicate with me:", key='query', on_change=submit)
+    user_input = st.session_state.user_input
+
+    st.write("입력하세요:", user_input)
+
+    if user_input:
+        result = get_assistant_response(client, my_assistant, assistant_thread, user_input)
+        st.header('assistant:blue[cool]:')
+        st.text(result)

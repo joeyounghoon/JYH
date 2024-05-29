@@ -1,9 +1,6 @@
 import streamlit as st    
 from openai import OpenAI
 
-import streamlit as st
-import openai
-
 # 페이지 구성 설정
 st.set_page_config(page_title="OpenAI API Web App", layout="wide")
 
